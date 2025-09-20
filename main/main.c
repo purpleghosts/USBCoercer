@@ -27,6 +27,7 @@ static const char *TAG = "USBCoercer";
 static struct netif s_usb_netif;
 static usbc_app_config_t s_app_config;
 static dhcp_entry_t s_dhcp_entries[CONFIG_USBCOERCER_DHCP_POOL_SIZE];
+static dhcp_route_option_t s_dhcp_route_options[CONFIG_USBCOERCER_STATIC_ROUTE_MAX_COUNT];
 static dhcp_option_settings_t s_dhcp_options;
 static dhcp_config_t s_dhcp_server_cfg;
 static const usbc_app_config_t *s_netif_config = NULL;
@@ -184,8 +185,24 @@ static esp_err_t start_dhcp_server(const usbc_app_config_t *config)
     }
 
     s_dhcp_options.enable_routes = (config->routes.count > 0);
-    s_dhcp_options.route_count = s_dhcp_options.enable_routes ? config->routes.count : 0;
-    s_dhcp_options.routes = s_dhcp_options.enable_routes ? config->routes.routes : NULL;
+    if (s_dhcp_options.enable_routes) {
+        size_t route_count = config->routes.count;
+        if (route_count > CONFIG_USBCOERCER_STATIC_ROUTE_MAX_COUNT) {
+            ESP_LOGW(TAG, "Truncating static route list (%u -> %u)",
+                     (unsigned)route_count, (unsigned)CONFIG_USBCOERCER_STATIC_ROUTE_MAX_COUNT);
+            route_count = CONFIG_USBCOERCER_STATIC_ROUTE_MAX_COUNT;
+        }
+        for (size_t i = 0; i < route_count; ++i) {
+            s_dhcp_route_options[i].prefix_length = config->routes.routes[i].prefix_length;
+            s_dhcp_route_options[i].network = config->routes.routes[i].network;
+            s_dhcp_route_options[i].gateway = config->routes.routes[i].gateway;
+        }
+        s_dhcp_options.route_count = route_count;
+        s_dhcp_options.routes = s_dhcp_route_options;
+    } else {
+        s_dhcp_options.route_count = 0;
+        s_dhcp_options.routes = NULL;
+    }
     s_dhcp_options.enable_wpad = config->wpad.enabled;
     s_dhcp_options.wpad_url = config->wpad.enabled ? config->wpad.url : NULL;
 

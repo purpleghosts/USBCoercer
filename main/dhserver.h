@@ -71,7 +71,7 @@ typedef struct dhcp_config
         const char               *domain;
         int                       num_entry;
         dhcp_entry_t             *entries;
-        const dhcp_option_settings *options;
+        const dhcp_option_settings_t *options;
 } dhcp_config_t;
 
 #ifdef __cplusplus
