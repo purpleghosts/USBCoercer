@@ -1,103 +1,80 @@
 | Supported Targets | ESP32-S2 | ESP32-S3 |
 | ----------------- | -------- | -------- |
 
-# TinyUSB Network Control Model Device Example
+# USBCoercer: TinyUSB WPAD Coercer Device
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+USBCoercer turns an ESP32 development board with native USB-OTG into an Ethernet-over-USB gadget capable of coercing proxy configuration via WPAD. It builds on the **TinyUSB Network Control Model (NCM)** example and adds a minimalist DHCP server that injects DHCP option 252 (WPAD/PAC) and, aditionally, classless static routes (option 121) for block EDR telemetry if needed.
 
-Network Control Model (NCM) is a sub-class of Communication Device Class (CDC) USB Device for Ethernet-over-USB applications.
+The project is intended for security testing and lab demonstrations. Always obtain explicit authorization before using it.
 
-In this example, we implemented the ESP development board to transmit WiFi data to the Linux or Windows host via USB, so that the host could access the Internet.
+## Key Features
 
-As a USB stack, a TinyUSB component is used.
+- TinyUSB-based USB NCM Ethernet gadget
+- Embedded DHCP server providing optional classless static routes (option 121) and configurable WPAD/PAC URL (option 252).
 
-## How to use example
+## Requirements
 
-### Hardware Required
+### Hardware
 
-Any ESP board that have USB-OTG supported.
+- ESP32 board with native USB-OTG
+- (In some models) USB cable connecting the SoC OTG port to the target machine.
+- 
+### Software
 
-#### Pin Assignment
+- Espressif ESP-IDF v5.5 (or newer) with TinyUSB support enabled.
+- ESP-IDF toolchain and Python environment installed via the standard `install.sh`/`export.sh` scripts.
 
-_Note:_ In case your board doesn't have micro-USB connector connected to USB-OTG peripheral, you may have to DIY a cable and connect **D+** and **D-** to the pins listed below.
+## Quick Start
 
-See common pin assignments for USB Device examples from [upper level](../../README.md#common-pin-assignments).
+1. **Set up ESP-IDF**
+   ```bash
+   . $HOME/esp/esp-idf/export.sh
+   ```
+2. **Configure the project (optional)**
+   ```bash
+   idf.py menuconfig
+   ```
+   Review the `USBCoercer Configuration` menu to tailor the local IP, DHCP pool, WPAD settings, etc.
+3. **Build**
+   ```bash
+   idf.py build
+   ```
+4. **Flash**
+   ```bash
+   idf.py flash
+   ```
 
-### Configure the project
+### Default Configuration
 
-Open the project configuration menu (`idf.py menuconfig`).
+`sdkconfig.defaults` provides a lab-friendly setup:
 
-In the `Example Configuration` menu:
+- Local IP: `192.168.7.1/24` with no default gateway.
+- DHCP pool of three addresses (`192.168.7.2` – `192.168.7.4`).
+- DHCP domain: `badnet`.
+- WPAD enabled, pointing to `http://192.168.7.1/wpad.dat`. The firmware starts an embedded HTTP server that delivers this PAC file.
+- DNS option disabled (hosts retain their existing DNS servers).
+- Static routes and status LED disabled by default.
 
-* Set the Wi-Fi configuration.
-    * Set `WiFi SSID`.
-    * Set `WiFi Password`.
+Adjust `sdkconfig.defaults` or use `menuconfig` to adapt the environment to your tests. Rebuild the firmware (`idf.py build`) after changing any parameters.
 
-### Build, Flash, and Run
+## Network Behaviour
 
-Build the project and flash it to the board, then run monitor tool to view serial output:
+- The device exposes itself as a USB NCM Ethernet adapter using the configured MAC address.
+- The embedded DHCP server answers `DISCOVER`/`REQUEST` messages with the configured parameters.
+- When classless routes are enabled, option 121 is generated dynamically.
+- WPAD is enabled and a non-empty URL is provided, so the host retrieves the PAC file from the specified origin and applies the proxy settings.
 
-```
-idf.py -p PORT build flash monitor
-```
+## Using a NTLM Coercion Mechanism
 
-(Replace PORT with the name of the serial port to use.)
+Currently the deployment requires a **External server:** to point the WPAD URL and to coerce the authentication. Responder is useful for this job. 
 
-(To exit the serial monitor, type ``Ctrl-]``.)
+## Warnings
 
-See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
+- Manipulating WPAD or static routes can redirect traffic from the connected machine. Use this firmware only in controlled environments with informed consent.
+- The project targets lab scenarios; it does not implement additional security controls or configuration persistence.
 
-## Example Output
+## Acknowledgements
 
-After the flashing you should see the output at idf monitor:
+- Based on the official ESP-IDF TinyUSB NCM examples.
 
-```
-I (399) main_task: Calling app_main()
-I (429) USB_NCM: USB NCM device initialization
-W (429) TinyUSB: The device's configuration descriptor is not provided by user, using default.
-W (429) TinyUSB: The device's string descriptor is not provided by user, using default.
-W (439) TinyUSB: The device's device descriptor is not provided by user, using default.
-I (449) tusb_desc:
-┌─────────────────────────────────┐
-│  USB Device Descriptor Summary  │
-├───────────────────┬─────────────┤
-│bDeviceClass       │ 239         │
-├───────────────────┼─────────────┤
-│bDeviceSubClass    │ 2           │
-├───────────────────┼─────────────┤
-│bDeviceProtocol    │ 1           │
-├───────────────────┼─────────────┤
-│bMaxPacketSize0    │ 64          │
-├───────────────────┼─────────────┤
-│idVendor           │ 0x303a      │
-├───────────────────┼─────────────┤
-│idProduct          │ 0x4001      │
-├───────────────────┼─────────────┤
-│bcdDevice          │ 0x100       │
-├───────────────────┼─────────────┤
-│iManufacturer      │ 0x1         │
-├───────────────────┼─────────────┤
-│iProduct           │ 0x2         │
-├───────────────────┼─────────────┤
-│iSerialNumber      │ 0x3         │
-├───────────────────┼─────────────┤
-│bNumConfigurations │ 0x1         │
-└───────────────────┴─────────────┘
-I (619) TinyUSB: TinyUSB Driver installed
-I (619) USB_NCM: WiFi initialization
-I (619) pp: pp rom version: e7ae62f
-I (629) net80211: net80211 rom version: e7ae62f
-I (689) wifi_init: rx ba win: 6
-I (699) wifi_init: tcpip mbox: 32
-I (699) wifi_init: udp mbox: 6
-I (699) wifi_init: tcp mbox: 6
-I (709) wifi_init: tcp tx win: 5744
-I (709) wifi_init: tcp rx win: 5744
-I (719) wifi_init: tcp mss: 1440
-I (719) wifi_init: WiFi IRAM OP enabled
-I (719) wifi_init: WiFi RX IRAM OP enabled
-I (729) phy_init: phy_version 600,8dd0147,Mar 31 2023,16:34:12
-I (779) USB_NCM: USB NCM and WiFi initialized and started
-I (779) main_task: Returned from app_main()
-I (849) USB_NCM: WiFi STA connected
-```
+Happy (and responsible) hacking!
