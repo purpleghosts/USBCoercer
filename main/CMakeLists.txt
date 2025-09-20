@@ -1,6 +1,7 @@
-idf_component_register(SRCS "main.c" 
+idf_component_register(SRCS "main.c"
                        "dhserver.c"
+                       "usbc_config.c"
                        INCLUDE_DIRS "."
-		       REQUIRES lwip
+                       REQUIRES lwip
                        PRIV_REQUIRES esp_wifi nvs_flash
                        )

@@ -44,6 +44,20 @@ The project is intended for security testing and lab demonstrations. Always obta
    idf.py flash
    ```
 
+### Configuration Reference
+
+The project exposes a dedicated `USBCoercer Configuration` menu inside
+`idf.py menuconfig`:
+
+- **Interface** – set the USB-facing IPv4 address, subnet mask and gateway as
+  well as the locally administered MAC address advertised to the host.
+- **DHCP server** – control the lease pool start/end, lease time, optional DNS
+  server and domain suffix (option 15).
+- **WPAD** – toggle option 252 and define the URL served to connected hosts.
+- **Static routes** – enable option 121 and provide a semicolon-separated list
+  of routes using the `destination/prefix,gateway` syntax (for example,
+  `3.121.6.180/32,192.168.7.1`). Leave the list empty to omit the option.
+
 ### Default Configuration
 
 `sdkconfig.defaults` provides a lab-friendly setup:
@@ -51,9 +65,10 @@ The project is intended for security testing and lab demonstrations. Always obta
 - Local IP: `192.168.7.1/24` with no default gateway.
 - DHCP pool of three addresses (`192.168.7.2` – `192.168.7.4`).
 - DHCP domain: `badnet`.
-- WPAD enabled, pointing to `http://192.168.7.1/wpad.dat`. The firmware starts an embedded HTTP server that delivers this PAC file.
+- WPAD enabled, pointing to `http://192.168.7.1/wpad.dat`. Host a PAC file on
+  the configured origin or adapt the URL as required.
 - DNS option disabled (hosts retain their existing DNS servers).
-- Static routes and status LED disabled by default.
+- Static routes disabled by default (option 121 is only sent when configured).
 
 Adjust `sdkconfig.defaults` or use `menuconfig` to adapt the environment to your tests. Rebuild the firmware (`idf.py build`) after changing any parameters.
 
