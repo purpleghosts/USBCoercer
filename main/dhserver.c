@@ -7,6 +7,10 @@
 
 #include "dhserver.h"
 
+#include "esp_log.h"
+#include "lwip/inet.h"
+#include "lwip/ip4_addr.h"
+
 /* DHCP message type */
 #define DHCP_DISCOVER       1
 #define DHCP_OFFER          2
@@ -62,37 +66,27 @@ static const dhcp_config_t *config = NULL;
 static char magic_cookie[] = {0x63,0x82,0x53,0x63};
 
 /* Rutas /32 -> 192.168.7.1 */
-static const uint8_t g_classless_routes[] =
-{
-    // Estructura: [prefijo] [dest] [gateway]
-    // 1) 3.121.6.180/32 -> 192.168.7.1
-    32, 3, 121, 6, 180,    192,168,7,1,
-    // 2) 3.121.187.176/32 -> 192.168.7.1
-    32, 3, 121,187,176,    192,168,7,1,
-    // 3) 3.121.238.86/32 -> 192.168.7.1
-    32, 3, 121,238, 86,    192,168,7,1,
-    // 4) 3.125.15.130/32 -> 192.168.7.1
-    32, 3, 125, 15,130,    192,168,7,1,
-    // 5) 18.158.187.80/32 -> 192.168.7.1
-    32, 18,158,187, 80,    192,168,7,1,
-    // 6) 18.198.53.88/32 -> 192.168.7.1
-    32, 18,198, 53, 88,    192,168,7,1,
-};
-
-/* WPAD URL */
-static const char g_wpad_url[] = "http://192.168.1.175/wpad.dat";
+static const char *TAG = "DHCP_SERVER";
 
 /* Estructuras helper */
 static ip4_addr_t get_ip(const uint8_t *pnt)
 {
+    uint32_t value = ((uint32_t)pnt[0] << 24) |
+                     ((uint32_t)pnt[1] << 16) |
+                     ((uint32_t)pnt[2] << 8) |
+                     ((uint32_t)pnt[3]);
     ip4_addr_t result;
-    memcpy(&result, pnt, sizeof(result));
+    result.addr = lwip_htonl(value);
     return result;
 }
 
 static void set_ip(uint8_t *pnt, ip4_addr_t value)
 {
-    memcpy(pnt, &value.addr, sizeof(value.addr));
+    uint32_t host = lwip_ntohl(ip4_addr_get_u32(&value));
+    pnt[0] = (host >> 24) & 0xFF;
+    pnt[1] = (host >> 16) & 0xFF;
+    pnt[2] = (host >> 8) & 0xFF;
+    pnt[3] = host & 0xFF;
 }
 
 /* Buscar la IP en la tabla */
@@ -105,7 +99,7 @@ static dhcp_entry_t *entry_by_ip(ip4_addr_t ip)
 }
 
 /* Buscar la MAC en la tabla */
-static dhcp_entry_t *entry_by_mac(uint8_t *mac)
+static dhcp_entry_t *entry_by_mac(const uint8_t *mac)
 {
     for (int i = 0; i < config->num_entry; i++)
         if (memcmp(config->entries[i].mac, mac, 6) == 0)
@@ -113,9 +107,10 @@ static dhcp_entry_t *entry_by_mac(uint8_t *mac)
     return NULL;
 }
 
-static __inline bool is_vacant(dhcp_entry_t *entry)
+static __inline bool is_vacant(const dhcp_entry_t *entry)
 {
-    return memcmp("\0\0\0\0\0", entry->mac, 5) == 0;
+    static const uint8_t zero[6] = {0};
+    return memcmp(entry->mac, zero, sizeof(entry->mac)) == 0;
 }
 
 static dhcp_entry_t *vacant_address(void)
@@ -155,9 +150,8 @@ static uint8_t *find_dhcp_option(uint8_t *attrs, int size, uint8_t attr)
 static int fill_options(
     void *dest,
     uint8_t msg_type,
-    const char *domain,
-    ip4_addr_t dns,
-    int lease_time,
+    const dhcp_config_t *cfg,
+    uint32_t lease_time,
     ip4_addr_t serverid,
     ip4_addr_t router,
     ip4_addr_t subnet)
@@ -199,40 +193,95 @@ static int fill_options(
     }
 
     // 6) Domain name
-    if (domain && domain[0])
+    if (cfg->domain && cfg->domain[0])
     {
-        uint8_t len = (uint8_t)strlen(domain);
+        size_t len = strlen(cfg->domain);
+        if (len > 255) len = 255;
         *ptr++ = DHCP_DNSDOMAIN;
-        *ptr++ = len;
-        memcpy(ptr, domain, len);
+        *ptr++ = (uint8_t)len;
+        memcpy(ptr, cfg->domain, len);
         ptr += len;
     }
 
     // 7) DNS server
-    if (dns.addr != 0)
+    if (cfg->dns.addr != 0)
     {
         *ptr++ = DHCP_DNSSERVER;
         *ptr++ = 4;
-        set_ip(ptr, dns);
+        set_ip(ptr, cfg->dns);
         ptr += 4;
     }
 
     // 8) Opción 121: Classless Static Routes
-    //    (si quieres siempre enviarlo)
+    if (cfg->options && cfg->options->enable_routes &&
+        cfg->options->route_count > 0 && cfg->options->routes)
     {
-        const uint8_t routes_len = sizeof(g_classless_routes);
-        *ptr++ = DHCP_CLASSLESSROUTE; // 121
-        *ptr++ = routes_len; 
-        memcpy(ptr, g_classless_routes, routes_len);
-        ptr += routes_len;
+        uint8_t *option_start = ptr;
+        *ptr++ = DHCP_CLASSLESSROUTE;
+        uint8_t *len_ptr = ptr++;
+        uint16_t option_len = 0;
+
+        for (size_t i = 0; i < cfg->options->route_count; ++i)
+        {
+            const dhcp_route_option_t *route = &cfg->options->routes[i];
+            uint8_t prefix = route->prefix_length;
+            if (prefix > 32)
+            {
+                ESP_LOGW(TAG, "Ignoring route with invalid prefix length %u", prefix);
+                continue;
+            }
+
+            uint8_t prefix_bytes = (prefix + 7) / 8;
+            if (prefix_bytes > 4)
+            {
+                prefix_bytes = 4;
+            }
+
+            if ((size_t)option_len + 1 + prefix_bytes + 4 > 255)
+            {
+                ESP_LOGW(TAG, "Classless routes option full, skipping remaining entries");
+                break;
+            }
+
+            *ptr++ = prefix;
+            option_len++;
+
+            uint32_t network_host = lwip_ntohl(ip4_addr_get_u32(&route->network));
+            for (uint8_t j = 0; j < prefix_bytes; ++j)
+            {
+                uint8_t shift = 24 - (j * 8);
+                *ptr++ = (network_host >> shift) & 0xFF;
+            }
+            option_len += prefix_bytes;
+
+            uint32_t gateway_host = lwip_ntohl(ip4_addr_get_u32(&route->gateway));
+            for (uint8_t j = 0; j < 4; ++j)
+            {
+                uint8_t shift = 24 - (j * 8);
+                *ptr++ = (gateway_host >> shift) & 0xFF;
+            }
+            option_len += 4;
+        }
+
+        if (option_len == 0)
+        {
+            ptr = option_start;
+        }
+        else
+        {
+            *len_ptr = (uint8_t)option_len;
+        }
     }
 
     // 9) Opción 252: WPAD
+    if (cfg->options && cfg->options->enable_wpad &&
+        cfg->options->wpad_url && cfg->options->wpad_url[0])
     {
-        uint8_t wlen = (uint8_t)strlen(g_wpad_url);
+        size_t wlen = strlen(cfg->options->wpad_url);
+        if (wlen > 255) wlen = 255;
         *ptr++ = DHCP_WPAD; // 252
-        *ptr++ = wlen;
-        memcpy(ptr, g_wpad_url, wlen);
+        *ptr++ = (uint8_t)wlen;
+        memcpy(ptr, cfg->options->wpad_url, wlen);
         ptr += wlen;
     }
 
@@ -248,6 +297,10 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
                           struct pbuf *p,
                           const ip_addr_t *addr, u16_t port)
 {
+    if (!config) {
+        pbuf_free(p);
+        return;
+    }
     struct netif *netif = netif_get_by_index(p->if_idx);
     if (!netif) {
         pbuf_free(p);
@@ -272,10 +325,7 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
     {
         case DHCP_DISCOVER:
         {
-            // Buscar si la MAC ya está en la tabla
-            // (no implementado “entry_by_mac” en tu snippet, corrige si lo deseas)
-            dhcp_entry_t *entry = NULL;
-            //entry = entry_by_mac(dhcp_data.dp_chaddr);
+            dhcp_entry_t *entry = entry_by_mac(dhcp_data.dp_chaddr);
             if (!entry) entry = vacant_address();
             if (!entry) break;
 
@@ -289,10 +339,9 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
 
             fill_options(dhcp_data.dp_options,
                          DHCP_OFFER,
-                         config->domain,
-                         config->dns,
+                         config,
                          entry->lease,
-                         *netif_ip4_addr(netif), 
+                         *netif_ip4_addr(netif),
                          config->router,
                          *netif_ip4_netmask(netif));
 
@@ -319,7 +368,8 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
             ip4_addr_t requested = get_ip(ipreq);
             dhcp_entry_t *entry = entry_by_ip(requested);
             if (!entry) break;
-            if (!is_vacant(entry)) break;
+            if (!is_vacant(entry) && memcmp(entry->mac, dhcp_data.dp_chaddr, 6) != 0)
+                break;
 
             // Preparamos ACK
             memcpy(dhcp_data.dp_yiaddr, ipreq, 4);
@@ -331,8 +381,7 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
 
             fill_options(dhcp_data.dp_options,
                          DHCP_ACK,
-                         config->domain,
-                         config->dns,
+                         config,
                          entry->lease,
                          *netif_ip4_addr(netif),
                          config->router,
@@ -349,6 +398,15 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
         }
         break;
 
+        case DHCP_RELEASE:
+        {
+            dhcp_entry_t *entry = entry_by_mac(dhcp_data.dp_chaddr);
+            if (entry) {
+                free_entry(entry);
+            }
+        }
+        break;
+
         default:
             break;
     }
@@ -361,11 +419,16 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
 --------------------*/
 err_t dhserv_init(const dhcp_config_t *c)
 {
+    if (!c || !c->entries || c->num_entry <= 0) {
+        return ERR_ARG;
+    }
+
     dhserv_free(); // Limpia pcb previo
     pcb = udp_new();
     if (!pcb) return ERR_MEM;
 
-    err_t err = udp_bind(pcb, IP_ADDR_ANY, c->port);
+    uint16_t port = c->port ? c->port : 67;
+    err_t err = udp_bind(pcb, IP_ADDR_ANY, port);
     if (err != ERR_OK)
     {
         dhserv_free();
@@ -384,4 +447,5 @@ void dhserv_free(void)
         udp_remove(pcb);
         pcb = NULL;
     }
+    config = NULL;
 }

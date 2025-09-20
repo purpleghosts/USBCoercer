@@ -1,0 +1,91 @@
+menu "USBCoercer Configuration"
+
+config USBCOERCER_LOCAL_IP
+    string "Local IPv4 address"
+    default "192.168.7.1"
+    help
+        IPv4 address assigned to the USB NCM interface.
+
+config USBCOERCER_SUBNET_MASK
+    string "Subnet mask"
+    default "255.255.255.0"
+
+config USBCOERCER_GATEWAY
+    string "Gateway IPv4 address"
+    default "0.0.0.0"
+    help
+        Router advertised in DHCP option 3. Leave as 0.0.0.0 to avoid sending
+        a default gateway.
+
+config USBCOERCER_MAC_ADDRESS
+    string "Interface MAC address"
+    default "02:12:34:56:78:9A"
+    help
+        MAC address presented to the host. Use locally administered addresses
+        (bit 1 of the first octet set to 1) to avoid conflicts.
+
+config USBCOERCER_DHCP_POOL_START
+    string "DHCP pool start address"
+    default "192.168.7.2"
+
+config USBCOERCER_DHCP_POOL_SIZE
+    int "DHCP pool size"
+    range 1 32
+    default 3
+
+config USBCOERCER_DHCP_LEASE_TIME
+    int "DHCP lease time (seconds)"
+    range 60 604800
+    default 86400
+
+config USBCOERCER_DHCP_DNS
+    string "DHCP DNS server"
+    default ""
+    help
+        Optional DNS server (option 6). Leave empty to avoid overriding the
+        host configuration.
+
+config USBCOERCER_DHCP_DOMAIN_MAXLEN
+    int "Maximum DHCP domain length"
+    range 1 253
+    default 63
+
+config USBCOERCER_DHCP_DOMAIN
+    string "DHCP domain suffix"
+    default "badnet"
+
+config USBCOERCER_ENABLE_WPAD
+    bool "Provide WPAD URL via DHCP option 252"
+    default y
+
+config USBCOERCER_WPAD_URL_MAXLEN
+    int "Maximum WPAD URL length"
+    range 1 253
+    default 128
+
+config USBCOERCER_WPAD_URL
+    string "WPAD URL"
+    depends on USBCOERCER_ENABLE_WPAD
+    default "http://192.168.7.1/wpad.dat"
+    help
+        URL returned in DHCP option 252. Hosts fetch this location to retrieve
+        the PAC file.
+
+config USBCOERCER_ENABLE_STATIC_ROUTES
+    bool "Provide DHCP classless static routes (option 121)"
+    default n
+
+config USBCOERCER_STATIC_ROUTE_MAX_COUNT
+    int "Maximum number of static routes"
+    range 1 16
+    default 6
+
+config USBCOERCER_STATIC_ROUTES
+    string "Static routes list"
+    depends on USBCOERCER_ENABLE_STATIC_ROUTES
+    default "3.121.6.180/32,192.168.7.1;3.121.187.176/32,192.168.7.1;3.121.238.86/32,192.168.7.1;3.125.15.130/32,192.168.7.1;18.158.187.80/32,192.168.7.1;18.198.53.88/32,192.168.7.1"
+    help
+        Semicolon-separated list of routes in the form
+        "<destination>/<prefix>,<gateway>". Leave empty to omit option 121.
+
+endmenu

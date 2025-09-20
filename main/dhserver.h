@@ -31,8 +31,9 @@
 #ifndef DHSERVER_H
 #define DHSERVER_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "lwip/err.h"
@@ -46,14 +47,31 @@ typedef struct dhcp_entry
 	uint32_t   lease;
 } dhcp_entry_t;
 
+typedef struct dhcp_route_option
+{
+        uint8_t    prefix_length;
+        ip4_addr_t network;
+        ip4_addr_t gateway;
+} dhcp_route_option_t;
+
+typedef struct dhcp_option_settings
+{
+        bool                       enable_routes;
+        size_t                     route_count;
+        const dhcp_route_option_t *routes;
+        bool                       enable_wpad;
+        const char                *wpad_url;
+} dhcp_option_settings_t;
+
 typedef struct dhcp_config
 {
-	ip4_addr_t    router;
-	uint16_t      port;
-	ip4_addr_t    dns;
-	const char   *domain;
-	int           num_entry;
-	dhcp_entry_t *entries;
+        ip4_addr_t                router;
+        uint16_t                  port;
+        ip4_addr_t                dns;
+        const char               *domain;
+        int                       num_entry;
+        dhcp_entry_t             *entries;
+        const dhcp_option_settings *options;
 } dhcp_config_t;
 
 #ifdef __cplusplus
