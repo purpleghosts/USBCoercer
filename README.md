@@ -18,7 +18,7 @@ The project is intended for security testing and lab demonstrations. Always obta
 
 - ESP32 board with native USB-OTG
 - (In some models) USB cable connecting the SoC OTG port to the target machine.
-- 
+  
 ### Software
 
 - Espressif ESP-IDF v5.5 (or newer) with TinyUSB support enabled.
