@@ -10,6 +10,10 @@
 #include "tinyusb_net.h"
 #include "tusb.h"
 
+#if CONFIG_USBCOERCER_STATUS_LED
+#include "led_strip.h"
+#endif
+
 #include "lwip/err.h"
 #include "lwip/ethip6.h"
 #include "lwip/init.h"
@@ -31,6 +35,13 @@ static dhcp_route_option_t s_dhcp_route_options[CONFIG_USBCOERCER_STATIC_ROUTE_M
 static dhcp_option_settings_t s_dhcp_options;
 static dhcp_config_t s_dhcp_server_cfg;
 static const usbc_app_config_t *s_netif_config = NULL;
+
+#if CONFIG_USBCOERCER_STATUS_LED
+static led_strip_handle_t s_status_led;
+#endif
+
+static esp_err_t init_status_led(void);
+static void set_status_led_color(uint8_t red, uint8_t green, uint8_t blue);
 
 static esp_err_t init_nvs(void)
 {
@@ -226,6 +237,61 @@ static esp_err_t start_dhcp_server(const usbc_app_config_t *config)
     return ESP_OK;
 }
 
+static esp_err_t init_status_led(void)
+{
+#if CONFIG_USBCOERCER_STATUS_LED
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = CONFIG_USBCOERCER_STATUS_LED_GPIO,
+        .max_leds = 1,
+        .led_pixel_format = LED_PIXEL_FORMAT_GRB,
+        .led_model = LED_MODEL_WS2812,
+    };
+    led_strip_rmt_config_t rmt_config = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = CONFIG_USBCOERCER_STATUS_LED_RMT_RESOLUTION,
+        .flags = {
+            .with_dma = false,
+        },
+    };
+
+    esp_err_t err = led_strip_new_rmt_device(&strip_config, &rmt_config, &s_status_led);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialise status LED: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = led_strip_clear(s_status_led);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to clear status LED: %s", esp_err_to_name(err));
+    }
+#endif
+    return ESP_OK;
+}
+
+static void set_status_led_color(uint8_t red, uint8_t green, uint8_t blue)
+{
+#if CONFIG_USBCOERCER_STATUS_LED
+    if (!s_status_led) {
+        return;
+    }
+
+    esp_err_t err = led_strip_set_pixel(s_status_led, 0, red, green, blue);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to set status LED colour: %s", esp_err_to_name(err));
+        return;
+    }
+
+    err = led_strip_refresh(s_status_led);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to refresh status LED: %s", esp_err_to_name(err));
+    }
+#else
+    (void)red;
+    (void)green;
+    (void)blue;
+#endif
+}
+
 void app_main(void)
 {
     ESP_ERROR_CHECK(init_nvs());
@@ -238,10 +304,14 @@ void app_main(void)
     tcpip_init(NULL, NULL);
     ESP_ERROR_CHECK(init_network_interface(&s_app_config));
     ESP_ERROR_CHECK(start_dhcp_server(&s_app_config));
+    ESP_ERROR_CHECK(init_status_led());
 
     char ip_buf[IP4ADDR_STRLEN_MAX];
     ESP_LOGI(TAG, "USB interface up at %s",
              ip4addr_ntoa_r(&s_app_config.interface.local_ip, ip_buf, sizeof(ip_buf)));
+#if CONFIG_USBCOERCER_STATUS_LED
+    set_status_led_color(0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS, 0);
+#endif
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
