@@ -74,11 +74,14 @@ typedef struct dhcp_config
         const dhcp_option_settings_t *options;
 } dhcp_config_t;
 
+typedef void (*dhserv_request_callback_t)(void *ctx);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 err_t dhserv_init(const dhcp_config_t *c);
 void dhserv_free(void);
+void dhserv_register_request_callback(dhserv_request_callback_t callback, void *ctx);
 #ifdef __cplusplus
 }
 #endif

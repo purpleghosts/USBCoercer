@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -38,10 +39,14 @@ static const usbc_app_config_t *s_netif_config = NULL;
 
 #if CONFIG_USBCOERCER_STATUS_LED
 static led_strip_handle_t s_status_led;
+static bool s_dhcp_request_seen;
 #endif
 
 static esp_err_t init_status_led(void);
 static void set_status_led_color(uint8_t red, uint8_t green, uint8_t blue);
+#if CONFIG_USBCOERCER_STATUS_LED
+static void on_dhcp_request(void *ctx);
+#endif
 
 static esp_err_t init_nvs(void)
 {
@@ -291,6 +296,15 @@ static void set_status_led_color(uint8_t red, uint8_t green, uint8_t blue)
 #endif
 }
 
+#if CONFIG_USBCOERCER_STATUS_LED
+static void on_dhcp_request(void *ctx)
+{
+    (void)ctx;
+    s_dhcp_request_seen = true;
+    set_status_led_color(0, 0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS);
+}
+#endif
+
 void app_main(void)
 {
     ESP_ERROR_CHECK(init_nvs());
@@ -303,13 +317,20 @@ void app_main(void)
     tcpip_init(NULL, NULL);
     ESP_ERROR_CHECK(init_network_interface(&s_app_config));
     ESP_ERROR_CHECK(start_dhcp_server(&s_app_config));
+#if CONFIG_USBCOERCER_STATUS_LED
+    dhserv_register_request_callback(on_dhcp_request, NULL);
+#endif
     ESP_ERROR_CHECK(init_status_led());
 
     char ip_buf[IP4ADDR_STRLEN_MAX];
     ESP_LOGI(TAG, "USB interface up at %s",
              ip4addr_ntoa_r(&s_app_config.interface.local_ip, ip_buf, sizeof(ip_buf)));
 #if CONFIG_USBCOERCER_STATUS_LED
-    set_status_led_color(0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS, 0);
+    if (s_dhcp_request_seen) {
+        set_status_led_color(0, 0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS);
+    } else {
+        set_status_led_color(0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS, 0);
+    }
 #endif
 
     while (true) {
