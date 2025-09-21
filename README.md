@@ -11,7 +11,7 @@ The project is intended for security testing and lab demonstrations. Always obta
 
 - TinyUSB-based USB NCM Ethernet gadget
 - Embedded DHCP server providing optional classless static routes (option 121) and configurable WPAD/PAC URL (option 252).
-- Optional status LED indicator that turns green after the network stack is up on AtomS3U hardware.
+- Status LED indicator that turns green after the network stack is up on AtomS3U hardware, yellow after DHCP Discovery/Offer phase and blue when DHCP Request/ACK is done.
 
 ## Requirements
 
