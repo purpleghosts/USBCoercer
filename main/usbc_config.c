@@ -83,6 +83,38 @@ static char *trim(char *text)
     return text;
 }
 
+static bool extract_ipv4_from_url(const char *url, ip4_addr_t *out)
+{
+    if (!url || !out || url[0] == '\0') {
+        return false;
+    }
+
+    const char *host_start = strstr(url, "://");
+    host_start = host_start ? host_start + 3 : url;
+
+    const char *host_end = host_start;
+    while (*host_end && *host_end != '/' && *host_end != ':') {
+        ++host_end;
+    }
+
+    size_t host_len = (size_t)(host_end - host_start);
+    if (host_len == 0 || host_len >= IP4ADDR_STRLEN_MAX) {
+        return false;
+    }
+
+    char host_buf[IP4ADDR_STRLEN_MAX];
+    memcpy(host_buf, host_start, host_len);
+    host_buf[host_len] = '\0';
+
+    ip4_addr_t parsed = {0};
+    if (!ip4addr_aton(host_buf, &parsed)) {
+        return false;
+    }
+
+    *out = parsed;
+    return true;
+}
+
 static esp_err_t parse_single_route(char *spec, usbc_static_route_t *route)
 {
     char *separator = strchr(spec, ',');
@@ -233,6 +265,20 @@ esp_err_t usbc_load_config(usbc_app_config_t *config)
 #else
     config->wpad.enabled = false;
 #endif
+
+    if (config->wpad.enabled && config->dhcp.dns.addr == 0) {
+        ip4_addr_t inferred_dns = {0};
+        if (extract_ipv4_from_url(config->wpad.url, &inferred_dns)) {
+            config->dhcp.dns = inferred_dns;
+            char dns_buf[IP4ADDR_STRLEN_MAX];
+            ESP_LOGW(TAG,
+                     "No DHCP DNS configured; defaulting to WPAD host %s for compatibility",
+                     ip4addr_ntoa_r(&config->dhcp.dns, dns_buf, sizeof(dns_buf)));
+        } else {
+            ESP_LOGW(TAG,
+                     "WPAD enabled but no DHCP DNS configured; Windows clients may ignore option 252");
+        }
+    }
 
     err = parse_routes(config);
     if (err != ESP_OK) {
