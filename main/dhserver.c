@@ -64,6 +64,8 @@ static struct udp_pcb *pcb = NULL;
 static const dhcp_config_t *config = NULL;
 static dhserv_request_callback_t s_request_callback = NULL;
 static void *s_request_ctx = NULL;
+static dhserv_discover_callback_t s_discover_callback = NULL;
+static void *s_discover_ctx = NULL;
 
 static char magic_cookie[] = {0x63,0x82,0x53,0x63};
 
@@ -327,6 +329,9 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
     {
         case DHCP_DISCOVER:
         {
+            if (s_discover_callback) {
+                s_discover_callback(s_discover_ctx);
+            }
             dhcp_entry_t *entry = entry_by_mac(dhcp_data.dp_chaddr);
             if (!entry) entry = vacant_address();
             if (!entry) break;
@@ -455,10 +460,18 @@ void dhserv_free(void)
     config = NULL;
     s_request_callback = NULL;
     s_request_ctx = NULL;
+    s_discover_callback = NULL;
+    s_discover_ctx = NULL;
 }
 
 void dhserv_register_request_callback(dhserv_request_callback_t callback, void *ctx)
 {
     s_request_callback = callback;
     s_request_ctx = ctx;
+}
+
+void dhserv_register_discover_callback(dhserv_discover_callback_t callback, void *ctx)
+{
+    s_discover_callback = callback;
+    s_discover_ctx = ctx;
 }

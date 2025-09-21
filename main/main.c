@@ -40,12 +40,14 @@ static const usbc_app_config_t *s_netif_config = NULL;
 #if CONFIG_USBCOERCER_STATUS_LED
 static led_strip_handle_t s_status_led;
 static bool s_dhcp_request_seen;
+static bool s_dhcp_discover_seen;
 #endif
 
 static esp_err_t init_status_led(void);
 static void set_status_led_color(uint8_t red, uint8_t green, uint8_t blue);
 #if CONFIG_USBCOERCER_STATUS_LED
 static void on_dhcp_request(void *ctx);
+static void on_dhcp_discover(void *ctx);
 #endif
 
 static esp_err_t init_nvs(void)
@@ -303,6 +305,17 @@ static void on_dhcp_request(void *ctx)
     s_dhcp_request_seen = true;
     set_status_led_color(0, 0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS);
 }
+
+static void on_dhcp_discover(void *ctx)
+{
+    (void)ctx;
+    s_dhcp_discover_seen = true;
+    if (!s_dhcp_request_seen) {
+        set_status_led_color(CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS,
+                             CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS,
+                             0);
+    }
+}
 #endif
 
 void app_main(void)
@@ -318,6 +331,7 @@ void app_main(void)
     ESP_ERROR_CHECK(init_network_interface(&s_app_config));
     ESP_ERROR_CHECK(start_dhcp_server(&s_app_config));
 #if CONFIG_USBCOERCER_STATUS_LED
+    dhserv_register_discover_callback(on_dhcp_discover, NULL);
     dhserv_register_request_callback(on_dhcp_request, NULL);
 #endif
     ESP_ERROR_CHECK(init_status_led());
@@ -328,6 +342,10 @@ void app_main(void)
 #if CONFIG_USBCOERCER_STATUS_LED
     if (s_dhcp_request_seen) {
         set_status_led_color(0, 0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS);
+    } else if (s_dhcp_discover_seen) {
+        set_status_led_color(CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS,
+                             CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS,
+                             0);
     } else {
         set_status_led_color(0, CONFIG_USBCOERCER_STATUS_LED_BRIGHTNESS, 0);
     }
