@@ -26,6 +26,7 @@
 
 #include "dhserver.h"
 #include "usbc_config.h"
+#include "wpad_http_server.h"
 
 static const char *TAG = "USBCoercer";
 
@@ -329,6 +330,7 @@ void app_main(void)
 
     tcpip_init(NULL, NULL);
     ESP_ERROR_CHECK(init_network_interface(&s_app_config));
+    ESP_ERROR_CHECK(wpad_http_server_start(&s_app_config.wpad));
     ESP_ERROR_CHECK(start_dhcp_server(&s_app_config));
 #if CONFIG_USBCOERCER_STATUS_LED
     dhserv_register_discover_callback(on_dhcp_discover, NULL);

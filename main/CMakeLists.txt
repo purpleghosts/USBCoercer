@@ -7,7 +7,8 @@ endif()
 idf_component_register(SRCS "main.c"
                        "dhserver.c"
                        "usbc_config.c"
+                       "wpad_http_server.c"
                        INCLUDE_DIRS "."
-                       REQUIRES lwip
+                       REQUIRES esp_http_server lwip
                        PRIV_REQUIRES ${priv_requires}
                        )
