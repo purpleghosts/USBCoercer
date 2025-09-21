@@ -243,7 +243,6 @@ static esp_err_t init_status_led(void)
     led_strip_config_t strip_config = {
         .strip_gpio_num = CONFIG_USBCOERCER_STATUS_LED_GPIO,
         .max_leds = 1,
-        .led_pixel_format = LED_PIXEL_FORMAT_GRB,
         .led_model = LED_MODEL_WS2812,
     };
     led_strip_rmt_config_t rmt_config = {
