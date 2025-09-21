@@ -75,6 +75,7 @@ typedef struct dhcp_config
 } dhcp_config_t;
 
 typedef void (*dhserv_request_callback_t)(void *ctx);
+typedef void (*dhserv_discover_callback_t)(void *ctx);
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,6 +83,7 @@ extern "C" {
 err_t dhserv_init(const dhcp_config_t *c);
 void dhserv_free(void);
 void dhserv_register_request_callback(dhserv_request_callback_t callback, void *ctx);
+void dhserv_register_discover_callback(dhserv_discover_callback_t callback, void *ctx);
 #ifdef __cplusplus
 }
 #endif
