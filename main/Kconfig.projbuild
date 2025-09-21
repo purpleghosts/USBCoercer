@@ -71,6 +71,28 @@ config USBCOERCER_WPAD_URL
         URL returned in DHCP option 252. Hosts fetch this location to retrieve
         the PAC file.
 
+config USBCOERCER_WPAD_PAC_MAXLEN
+    int "Maximum inline WPAD PAC length"
+    depends on USBCOERCER_ENABLE_WPAD
+    range 1 4096
+    default 1024
+
+config USBCOERCER_WPAD_INLINE
+    bool "Serve WPAD PAC from embedded HTTP server"
+    depends on USBCOERCER_ENABLE_WPAD
+    default n
+    help
+        Enable the built-in HTTP server to serve the PAC content from
+        /wpad.dat. When disabled, the handler responds with 404.
+
+config USBCOERCER_WPAD_PAC_CONTENT
+    string "Inline WPAD PAC contents"
+    depends on USBCOERCER_WPAD_INLINE
+    default "function FindProxyForURL(url, host) { return \"DIRECT\"; }"
+    help
+        Script returned when serving the PAC file inline. The default forces
+        direct connections.
+
 config USBCOERCER_ENABLE_STATIC_ROUTES
     bool "Provide DHCP classless static routes (option 121)"
     default n

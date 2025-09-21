@@ -15,6 +15,11 @@ extern "C" {
 
 #define USBCOERCER_MAX_DHCP_DOMAIN_LEN CONFIG_USBCOERCER_DHCP_DOMAIN_MAXLEN
 #define USBCOERCER_MAX_WPAD_URL_LEN    CONFIG_USBCOERCER_WPAD_URL_MAXLEN
+#ifdef CONFIG_USBCOERCER_WPAD_PAC_MAXLEN
+#define USBCOERCER_MAX_WPAD_PAC_LEN    CONFIG_USBCOERCER_WPAD_PAC_MAXLEN
+#else
+#define USBCOERCER_MAX_WPAD_PAC_LEN    0
+#endif
 #define USBCOERCER_MAX_STATIC_ROUTES   CONFIG_USBCOERCER_STATIC_ROUTE_MAX_COUNT
 
 typedef struct {
@@ -41,6 +46,8 @@ typedef struct {
 typedef struct {
     bool enabled;
     char url[USBCOERCER_MAX_WPAD_URL_LEN + 1];
+    bool inline_enabled;
+    char pac[USBCOERCER_MAX_WPAD_PAC_LEN + 1];
 } usbc_wpad_config_t;
 
 typedef struct {

@@ -262,8 +262,23 @@ esp_err_t usbc_load_config(usbc_app_config_t *config)
     }
     memcpy(config->wpad.url, CONFIG_USBCOERCER_WPAD_URL, wpad_len);
     config->wpad.url[wpad_len] = '\0';
+#if CONFIG_USBCOERCER_WPAD_INLINE
+    config->wpad.inline_enabled = true;
+    size_t pac_len = strlen(CONFIG_USBCOERCER_WPAD_PAC_CONTENT);
+    if (pac_len > USBCOERCER_MAX_WPAD_PAC_LEN) {
+        ESP_LOGE(TAG, "Inline WPAD PAC exceeds maximum length (%d)", USBCOERCER_MAX_WPAD_PAC_LEN);
+        return ESP_ERR_INVALID_SIZE;
+    }
+    memcpy(config->wpad.pac, CONFIG_USBCOERCER_WPAD_PAC_CONTENT, pac_len);
+    config->wpad.pac[pac_len] = '\0';
+#else
+    config->wpad.inline_enabled = false;
+    config->wpad.pac[0] = '\0';
+#endif
 #else
     config->wpad.enabled = false;
+    config->wpad.inline_enabled = false;
+    config->wpad.pac[0] = '\0';
 #endif
 
     if (config->wpad.enabled && config->dhcp.dns.addr == 0) {
@@ -314,6 +329,12 @@ void usbc_log_config(const usbc_app_config_t *config)
     }
     if (config->wpad.enabled) {
         ESP_LOGI(TAG, "WPAD URL %s", config->wpad.url);
+        if (config->wpad.inline_enabled) {
+            ESP_LOGI(TAG, "WPAD inline PAC enabled (%u bytes)",
+                     (unsigned)strlen(config->wpad.pac));
+        } else {
+            ESP_LOGI(TAG, "WPAD inline PAC disabled");
+        }
     } else {
         ESP_LOGI(TAG, "WPAD disabled");
     }
