@@ -81,9 +81,9 @@ Adjust `sdkconfig.defaults` or use `menuconfig` to adapt the environment to your
 - When classless routes are enabled, option 121 is generated dynamically.
 - WPAD is enabled and a non-empty URL is provided, so the host retrieves the PAC file from the specified origin and applies the proxy settings.
 
-## Using a NTLM Coercion Mechanism
+## Using an NTLM Coercion Mechanism
 
-Currently the deployment requires a **External server** to point the Proxy with NTLM Auth and to coerce the authentication. [Responder](https://github.com/SpiderLabs/Responder) is useful for this job. An **External server** for serve WPAD.DAT file is optional.
+Currently, the deployment requires an **external server** to provide the NTLM-authenticated proxy and coerce authentication. [Responder](https://github.com/SpiderLabs/Responder) is useful for this job. An **external server** to serve the WPAD.DAT file is optional.
 
 ## Warnings
 
