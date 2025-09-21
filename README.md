@@ -3,7 +3,7 @@
 
 # USBCoercer: A TinyUSB based WPAD Coercion Device
 
-USBCoercer turns an ESP32 development board with native USB-OTG into an Ethernet-over-USB gadget capable of coercing proxy configuration via WPAD. It builds on the **TinyUSB Network Control Model (NCM)** example and adds a minimalist DHCP server that injects DHCP option 252 (WPAD/PAC) and, aditionally, classless static routes (option 121) for block EDR telemetry if needed.
+USBCoercer turns an ESP32 development board with native USB-OTG into an Ethernet-over-USB gadget capable of coercing proxy configuration via WPAD. It builds on the **TinyUSB Network Control Model (NCM)** example and adds a minimalist DHCP server that injects DHCP option 252 (WPAD/PAC) and, additionally, classless static routes (option 121) to block EDR telemetry if needed.
 
 The project is intended for security testing and lab demonstrations. Always obtain explicit authorization before using it.
 
