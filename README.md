@@ -1,7 +1,7 @@
-| Supported Targets | ESP32-S2 | ESP32-S3 |
-| ----------------- | -------- | -------- |
+| Supported Targets | ESP32-S3 |
+| ----------------- | -------- |
 
-# USBCoercer: TinyUSB WPAD Coercer Device
+# USBCoercer: A TinyUSB WPAD Coercer Device
 
 USBCoercer turns an ESP32 development board with native USB-OTG into an Ethernet-over-USB gadget capable of coercing proxy configuration via WPAD. It builds on the **TinyUSB Network Control Model (NCM)** example and adds a minimalist DHCP server that injects DHCP option 252 (WPAD/PAC) and, aditionally, classless static routes (option 121) for block EDR telemetry if needed.
 
@@ -17,13 +17,14 @@ The project is intended for security testing and lab demonstrations. Always obta
 
 ### Hardware
 
-- ESP32 board with native USB-OTG
+- ESP32-S3 board with native USB-OTG
 - (In some models) USB cable connecting the SoC OTG port to the target machine.
   
 ### Software
 
 - Espressif ESP-IDF v5.5 (or newer) with TinyUSB support enabled.
 - ESP-IDF toolchain and Python environment installed via the standard `install.sh`/`export.sh` scripts.
+- **Important:** This firmware has been developed with the 1.x branch of espressif/esp_tinyusb and has not been ported to the 2.x branch. Using the 2.x branch will result in compilation errors. The maximum supported version is [espressif/esp_tinyusb 1.6.0](https://components.espressif.com/components/espressif/esp_tinyusb/versions/1.6.0/readme).
 
 ## Quick Start
 
@@ -82,15 +83,20 @@ Adjust `sdkconfig.defaults` or use `menuconfig` to adapt the environment to your
 
 ## Using a NTLM Coercion Mechanism
 
-Currently the deployment requires a **External server:** to point the WPAD URL and to coerce the authentication. Responder is useful for this job. 
+Currently the deployment requires a **External server** to point the Proxy with NTLM Auth and to coerce the authentication. [Responder](https://github.com/SpiderLabs/Responder) is useful for this job. An **External server** for serve WPAD.DAT file is optional.
 
 ## Warnings
 
 - Manipulating WPAD or static routes can redirect traffic from the connected machine. Use this firmware only in controlled environments with informed consent.
 - The project targets lab scenarios; it does not implement additional security controls or configuration persistence.
 
+## Testing
+
+This firmware has been tested on [M5Stack AtomS3U](https://shop.m5stack.com/products/atoms3u) and worked properly. 
+
 ## Acknowledgements
 
-- Based on the official ESP-IDF TinyUSB NCM examples.
+- Based more or less closely, or distantly, on the official ESP-IDF TinyUSB NCM examples.
+- Refactored and improved with [Codex](https://openai.com/index/introducing-codex/).
 
 Happy (and responsible) hacking!
