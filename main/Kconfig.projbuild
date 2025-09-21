@@ -88,4 +88,34 @@ config USBCOERCER_STATIC_ROUTES
         Semicolon-separated list of routes in the form
         "<destination>/<prefix>,<gateway>". Leave empty to omit option 121.
 
+config USBCOERCER_STATUS_LED
+    bool "Enable status LED indicator"
+    default y
+    help
+        Enable the onboard addressable LED as a power-on status indicator.
+
+config USBCOERCER_STATUS_LED_GPIO
+    int "Status LED GPIO"
+    depends on USBCOERCER_STATUS_LED
+    range 0 48
+    default 35
+    help
+        GPIO connected to the AtomS3U addressable LED data input.
+
+config USBCOERCER_STATUS_LED_RMT_RESOLUTION
+    int "Status LED RMT resolution (Hz)"
+    depends on USBCOERCER_STATUS_LED
+    default 10000000
+    help
+        Clock frequency used for the RMT peripheral that drives the LED strip.
+
+config USBCOERCER_STATUS_LED_BRIGHTNESS
+    int "Status LED brightness"
+    depends on USBCOERCER_STATUS_LED
+    range 1 255
+    default 32
+    help
+        Intensity applied to the green channel once the firmware has finished
+        booting. Lower values reduce brightness.
+
 endmenu
