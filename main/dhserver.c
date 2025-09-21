@@ -299,6 +299,30 @@ static int fill_options(
 /*-----------------------------------------
    Procesar paquetes (Discover / Request)
 -----------------------------------------*/
+static err_t send_with_null_hwaddr(struct udp_pcb *upcb,
+                                   struct pbuf *p,
+                                   u16_t port,
+                                   struct netif *netif)
+{
+    if (!netif) {
+        return udp_sendto(upcb, p, IP_ADDR_BROADCAST, port);
+    }
+
+    const uint8_t hwlen = netif->hwaddr_len;
+    if (hwlen > NETIF_MAX_HWADDR_LEN) {
+        return udp_sendto(upcb, p, IP_ADDR_BROADCAST, port);
+    }
+
+    uint8_t hwaddr_backup[NETIF_MAX_HWADDR_LEN];
+    memcpy(hwaddr_backup, netif->hwaddr, hwlen);
+    memset(netif->hwaddr, 0, hwlen);
+
+    err_t err = udp_sendto(upcb, p, IP_ADDR_BROADCAST, port);
+
+    memcpy(netif->hwaddr, hwaddr_backup, hwlen);
+    return err;
+}
+
 static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
                           struct pbuf *p,
                           const ip_addr_t *addr, u16_t port)
@@ -359,7 +383,7 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
             struct pbuf *pp = pbuf_alloc(PBUF_TRANSPORT, sizeof(dhcp_data), PBUF_POOL);
             if (pp) {
                 memcpy(pp->payload, &dhcp_data, sizeof(dhcp_data));
-                udp_sendto(upcb, pp, IP_ADDR_BROADCAST, port);
+                send_with_null_hwaddr(upcb, pp, port, netif);
                 pbuf_free(pp);
             }
         }
@@ -405,7 +429,7 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
                 // Asociar la MAC
                 memcpy(entry->mac, dhcp_data.dp_chaddr, 6);
                 memcpy(pp->payload, &dhcp_data, sizeof(dhcp_data));
-                udp_sendto(upcb, pp, IP_ADDR_BROADCAST, port);
+                send_with_null_hwaddr(upcb, pp, port, netif);
                 pbuf_free(pp);
                 if (s_request_callback) {
                     s_request_callback(s_request_ctx);
