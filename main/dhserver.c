@@ -154,11 +154,13 @@ static uint8_t *find_dhcp_option(uint8_t *attrs, int size, uint8_t attr)
 static int fill_options(
     void *dest,
     uint8_t msg_type,
-    const dhcp_config_t *cfg,
+    const char *domain,
+    ip4_addr_t dns,
     uint32_t lease_time,
     ip4_addr_t serverid,
     ip4_addr_t router,
-    ip4_addr_t subnet)
+    ip4_addr_t subnet,
+    const dhcp_option_settings_t *options)
 {
     uint8_t *ptr = (uint8_t *)dest;
 
@@ -197,37 +199,37 @@ static int fill_options(
     }
 
     // 6) Domain name
-    if (cfg->domain && cfg->domain[0])
+    if (domain && domain[0])
     {
-        size_t len = strlen(cfg->domain);
+        size_t len = strlen(domain);
         if (len > 255) len = 255;
         *ptr++ = DHCP_DNSDOMAIN;
         *ptr++ = (uint8_t)len;
-        memcpy(ptr, cfg->domain, len);
+        memcpy(ptr, domain, len);
         ptr += len;
     }
 
     // 7) DNS server
-    if (cfg->dns.addr != 0)
+    if (dns.addr != 0)
     {
         *ptr++ = DHCP_DNSSERVER;
         *ptr++ = 4;
-        set_ip(ptr, cfg->dns);
+        set_ip(ptr, dns);
         ptr += 4;
     }
 
     // 8) Opción 121: Classless Static Routes
-    if (cfg->options && cfg->options->enable_routes &&
-        cfg->options->route_count > 0 && cfg->options->routes)
+    if (options && options->enable_routes &&
+        options->route_count > 0 && options->routes)
     {
         uint8_t *option_start = ptr;
         *ptr++ = DHCP_CLASSLESSROUTE;
         uint8_t *len_ptr = ptr++;
         uint16_t option_len = 0;
 
-        for (size_t i = 0; i < cfg->options->route_count; ++i)
+        for (size_t i = 0; i < options->route_count; ++i)
         {
-            const dhcp_route_option_t *route = &cfg->options->routes[i];
+            const dhcp_route_option_t *route = &options->routes[i];
             uint8_t prefix = route->prefix_length;
             if (prefix > 32)
             {
@@ -278,14 +280,14 @@ static int fill_options(
     }
 
     // 9) Opción 252: WPAD
-    if (cfg->options && cfg->options->enable_wpad &&
-        cfg->options->wpad_url && cfg->options->wpad_url[0])
+    if (options && options->enable_wpad &&
+        options->wpad_url && options->wpad_url[0])
     {
-        size_t wlen = strlen(cfg->options->wpad_url);
+        size_t wlen = strlen(options->wpad_url);
         if (wlen > 255) wlen = 255;
         *ptr++ = DHCP_WPAD; // 252
         *ptr++ = (uint8_t)wlen;
-        memcpy(ptr, cfg->options->wpad_url, wlen);
+        memcpy(ptr, options->wpad_url, wlen);
         ptr += wlen;
     }
 
@@ -346,11 +348,13 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
 
             fill_options(dhcp_data.dp_options,
                          DHCP_OFFER,
-                         config,
+                         config->domain,
+                         config->dns,
                          entry->lease,
                          *netif_ip4_addr(netif),
                          config->router,
-                         *netif_ip4_netmask(netif));
+                         *netif_ip4_netmask(netif),
+                         config->options);
 
             struct pbuf *pp = pbuf_alloc(PBUF_TRANSPORT, sizeof(dhcp_data), PBUF_POOL);
             if (pp) {
@@ -388,11 +392,13 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
 
             fill_options(dhcp_data.dp_options,
                          DHCP_ACK,
-                         config,
+                         config->domain,
+                         config->dns,
                          entry->lease,
                          *netif_ip4_addr(netif),
                          config->router,
-                         *netif_ip4_netmask(netif));
+                         *netif_ip4_netmask(netif),
+                         config->options);
 
             struct pbuf *pp = pbuf_alloc(PBUF_TRANSPORT, sizeof(dhcp_data), PBUF_POOL);
             if (pp) {
