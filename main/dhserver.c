@@ -62,6 +62,8 @@ typedef struct
 static DHCP_TYPE dhcp_data;
 static struct udp_pcb *pcb = NULL;
 static const dhcp_config_t *config = NULL;
+static dhserv_request_callback_t s_request_callback = NULL;
+static void *s_request_ctx = NULL;
 
 static char magic_cookie[] = {0x63,0x82,0x53,0x63};
 
@@ -394,6 +396,9 @@ static void udp_recv_proc(void *arg, struct udp_pcb *upcb,
                 memcpy(pp->payload, &dhcp_data, sizeof(dhcp_data));
                 udp_sendto(upcb, pp, IP_ADDR_BROADCAST, port);
                 pbuf_free(pp);
+                if (s_request_callback) {
+                    s_request_callback(s_request_ctx);
+                }
             }
         }
         break;
@@ -448,4 +453,12 @@ void dhserv_free(void)
         pcb = NULL;
     }
     config = NULL;
+    s_request_callback = NULL;
+    s_request_ctx = NULL;
+}
+
+void dhserv_register_request_callback(dhserv_request_callback_t callback, void *ctx)
+{
+    s_request_callback = callback;
+    s_request_ctx = ctx;
 }
